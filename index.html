@@ -381,6 +381,13 @@
                     <span class="font-mono font-bold tracking-widest">HOLO-DECK</span>
                 </button>
 
+                <!-- Kepler Lab Button -->
+                <button onclick="app.launchKeplerLab()"
+                    class="hidden md:flex items-center gap-2 px-4 py-2 bg-purple-600/20 border border-purple-500 text-purple-300 rounded hover:bg-purple-500 hover:text-white transition-all clip-corners">
+                    <i class="ph-bold ph-atom text-lg"></i>
+                    <span class="font-mono font-bold tracking-widest">KEPLER-LAB</span>
+                </button>
+
                 <!-- Language Toggle -->
                 <div class="lang-switch" onclick="app.toggleLanguage()">
                     <div class="lang-option active" id="btn-en">EN</div>
@@ -1695,6 +1702,324 @@
         };
 
         // --- 3. MAIN APP LOGIC ---
+
+        class KeplerLab {
+            constructor() {
+                this.canvas = document.getElementById('kepler-canvas');
+                this.container = document.getElementById('kepler-canvas-container');
+                this.scene = new THREE.Scene();
+                this.camera = new THREE.PerspectiveCamera(60, this.container.clientWidth / this.container.clientHeight, 0.1, 1000);
+                this.renderer = new THREE.WebGLRenderer({ canvas: this.canvas, antialias: true });
+                this.renderer.setSize(this.container.clientWidth, this.container.clientHeight);
+                this.renderer.setPixelRatio(window.devicePixelRatio);
+
+                this.state = {
+                    law: 1,
+                    eccentricity: 0.5,
+                    semiMajorAxis: 10,
+                    planet2Dist: 15,
+                    speed: 1,
+                    paused: false,
+                    time: 0
+                };
+
+                this.objects = {};
+                this.materials = {
+                    orbit: new THREE.LineBasicMaterial({ color: 0x8b5cf6, transparent: true, opacity: 0.5 }),
+                    sun: new THREE.MeshBasicMaterial({ color: 0xffff00 }),
+                    planet: new THREE.MeshBasicMaterial({ color: 0x22d3ee }),
+                    planet2: new THREE.MeshBasicMaterial({ color: 0xf472b6 }),
+                    focus: new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.5 }),
+                    area: new THREE.MeshBasicMaterial({ color: 0x8b5cf6, transparent: true, opacity: 0.2, side: THREE.DoubleSide })
+                };
+
+                this.initScene();
+                window.addEventListener('resize', () => this.onResize());
+            }
+
+            init() {
+                this.active = true;
+                this.setLaw(1);
+                this.animate();
+            }
+
+            stop() {
+                this.active = false;
+                cancelAnimationFrame(this.frameId);
+            }
+
+            initScene() {
+                // Sun
+                const sunGeo = new THREE.SphereGeometry(1, 32, 32);
+                this.objects.sun = new THREE.Mesh(sunGeo, this.materials.sun);
+                this.scene.add(this.objects.sun);
+
+                // Planet
+                const planetGeo = new THREE.SphereGeometry(0.4, 16, 16);
+                this.objects.planet = new THREE.Mesh(planetGeo, this.materials.planet);
+                this.scene.add(this.objects.planet);
+
+                // Planet 2 (for Law 3)
+                this.objects.planet2 = new THREE.Mesh(planetGeo, this.materials.planet2);
+                this.objects.planet2.visible = false;
+                this.scene.add(this.objects.planet2);
+
+                // Orbit Line
+                const orbitGeo = new THREE.BufferGeometry();
+                this.objects.orbit = new THREE.Line(orbitGeo, this.materials.orbit);
+                this.scene.add(this.objects.orbit);
+
+                // Orbit Line 2 (for Law 3)
+                this.objects.orbit2 = new THREE.Line(orbitGeo.clone(), this.materials.orbit.clone());
+                this.objects.orbit2.material.color.setHex(0xf472b6);
+                this.objects.orbit2.visible = false;
+                this.scene.add(this.objects.orbit2);
+
+                // Foci (for Law 1)
+                this.objects.focus2 = new THREE.Mesh(new THREE.SphereGeometry(0.2), this.materials.focus);
+                this.scene.add(this.objects.focus2);
+
+                // Sector (for Law 2)
+                this.objects.sector = new THREE.Mesh(new THREE.BufferGeometry(), this.materials.area);
+                this.objects.sector.visible = false;
+                this.scene.add(this.objects.sector);
+
+                // Grid
+                const grid = new THREE.GridHelper(50, 50, 0x333333, 0x111111);
+                grid.rotation.x = Math.PI / 2;
+                this.scene.add(grid);
+
+                this.camera.position.set(0, 0, 30);
+            }
+
+            setLaw(id) {
+                this.state.law = id;
+                this.state.time = 0;
+
+                // Update UI Tabs
+                [1, 2, 3].forEach(i => {
+                    const btn = document.getElementById(`tab-law-${i}`);
+                    if (i === id) {
+                        btn.classList.remove('text-gray-400', 'hover:text-white');
+                        btn.classList.add('bg-purple-600', 'text-white', 'shadow-lg');
+                    } else {
+                        btn.classList.add('text-gray-400', 'hover:text-white');
+                        btn.classList.remove('bg-purple-600', 'text-white', 'shadow-lg');
+                    }
+                });
+
+                // Update Info & Controls
+                const title = document.getElementById('kepler-law-title');
+                const desc = document.getElementById('kepler-law-desc');
+                const controls = document.getElementById('kepler-controls');
+                const stats = document.getElementById('kepler-stats');
+
+                controls.innerHTML = '';
+                stats.innerHTML = '';
+
+                // Reset Visibility
+                this.objects.planet2.visible = false;
+                this.objects.orbit2.visible = false;
+                this.objects.focus2.visible = false;
+                this.objects.sector.visible = false;
+
+                if (id === 1) {
+                    title.innerText = "Law 1: The Law of Ellipses";
+                    desc.innerText = "All planets move in elliptical orbits, with the sun at one focus.";
+                    this.objects.focus2.visible = true;
+
+                    controls.innerHTML = `
+                        <div>
+                            <label class="block text-gray-400 text-xs font-bold mb-2 uppercase">Eccentricity (e)</label>
+                            <input type="range" min="0" max="0.8" step="0.01" value="${this.state.eccentricity}" 
+                                class="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-purple-500"
+                                oninput="keplerLab.updateParam('eccentricity', this.value)">
+                            <div class="flex justify-between text-xs text-gray-500 mt-1">
+                                <span>Circle (0)</span>
+                                <span id="val-ecc">${this.state.eccentricity}</span>
+                                <span>Ellipse (0.8)</span>
+                            </div>
+                        </div>
+                    `;
+                } else if (id === 2) {
+                    title.innerText = "Law 2: The Law of Equal Areas";
+                    desc.innerText = "A line that connects a planet to the sun sweeps out equal areas in equal times.";
+                    this.objects.sector.visible = true;
+
+                    controls.innerHTML = `
+                        <div>
+                            <label class="block text-gray-400 text-xs font-bold mb-2 uppercase">Eccentricity (e)</label>
+                            <input type="range" min="0" max="0.8" step="0.01" value="${this.state.eccentricity}" 
+                                class="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-purple-500"
+                                oninput="keplerLab.updateParam('eccentricity', this.value)">
+                        </div>
+                        <div class="p-4 bg-purple-900/20 border border-purple-500/30 rounded text-sm text-purple-200">
+                            Watch the planet speed up near the Sun (Perihelion) and slow down when far away (Aphelion).
+                        </div>
+                    `;
+                } else if (id === 3) {
+                    title.innerText = "Law 3: The Law of Harmonies";
+                    desc.innerText = "The square of the orbital period of a planet is directly proportional to the cube of the semi-major axis of its orbit.";
+                    this.objects.planet2.visible = true;
+                    this.objects.orbit2.visible = true;
+
+                    controls.innerHTML = `
+                        <div>
+                            <label class="block text-gray-400 text-xs font-bold mb-2 uppercase">Planet 2 Distance (a)</label>
+                            <input type="range" min="5" max="25" step="0.5" value="${this.state.planet2Dist}" 
+                                class="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-pink-500"
+                                oninput="keplerLab.updateParam('planet2Dist', this.value)">
+                        </div>
+                    `;
+                }
+
+                this.updateOrbit();
+            }
+
+            updateParam(key, value) {
+                this.state[key] = parseFloat(value);
+                if (document.getElementById('val-ecc')) {
+                    document.getElementById('val-ecc').innerText = value;
+                }
+                this.updateOrbit();
+            }
+
+            updateOrbit() {
+                const a = this.state.semiMajorAxis;
+                const e = this.state.eccentricity;
+                const c = a * e; // Distance from center to focus
+
+                // Rebuild Orbit 1 Geometry
+                const points = [];
+                for (let i = 0; i <= 100; i++) {
+                    const theta = (i / 100) * Math.PI * 2;
+                    const r = (a * (1 - e * e)) / (1 + e * Math.cos(theta));
+                    points.push(new THREE.Vector3(r * Math.cos(theta), r * Math.sin(theta), 0));
+                }
+                this.objects.orbit.geometry.setFromPoints(points);
+
+                // Update Focus 2 Position
+                this.objects.focus2.position.set(-2 * c, 0, 0); // Sun is at (0,0), other focus is at (-2ae, 0) relative to sun? 
+                // Wait, standard polar equation puts Sun at origin (one focus).
+                // Center of ellipse is at (-c, 0). Other focus is at (-2c, 0).
+                this.objects.focus2.position.set(-2 * c, 0, 0);
+
+                // Law 3: Update Orbit 2
+                if (this.state.law === 3) {
+                    const a2 = this.state.planet2Dist;
+                    const points2 = [];
+                    for (let i = 0; i <= 100; i++) {
+                        const theta = (i / 100) * Math.PI * 2;
+                        const r = a2; // Circular for simplicity in Law 3 demo, or e=0
+                        points2.push(new THREE.Vector3(r * Math.cos(theta), r * Math.sin(theta), 0));
+                    }
+                    this.objects.orbit2.geometry.setFromPoints(points2);
+
+                    // Update Stats
+                    const T1 = Math.sqrt(Math.pow(a, 3));
+                    const T2 = Math.sqrt(Math.pow(a2, 3));
+                    const ratio = (T2 * T2) / (a2 * a2 * a2);
+
+                    const stats = document.getElementById('kepler-stats');
+                    stats.innerHTML = `
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <div class="text-xs text-cyan-400">PLANET 1 (BLUE)</div>
+                                <div>Dist (a): ${a.toFixed(1)}</div>
+                                <div>Period (T): ${T1.toFixed(1)}</div>
+                            </div>
+                            <div>
+                                <div class="text-xs text-pink-400">PLANET 2 (PINK)</div>
+                                <div>Dist (a): ${a2.toFixed(1)}</div>
+                                <div>Period (T): ${T2.toFixed(1)}</div>
+                            </div>
+                        </div>
+                        <div class="mt-2 pt-2 border-t border-white/10 text-center text-xs text-gray-500">
+                            Ratio T²/a³ ≈ 1.00 (Constant)
+                        </div>
+                    `;
+                }
+            }
+
+            animate() {
+                if (!this.active) return;
+                this.frameId = requestAnimationFrame(() => this.animate());
+
+                this.state.time += 0.01 * this.state.speed;
+                const t = this.state.time;
+
+                // Animate Planet 1
+                const a = this.state.semiMajorAxis;
+                const e = this.state.eccentricity;
+
+                // Solve Kepler's Equation M = E - e sin E (Approximation)
+                // Mean Anomaly M
+                const M = t;
+                // Eccentric Anomaly E (Iterative Newton's method)
+                let E = M;
+                for (let i = 0; i < 5; i++) {
+                    E = M + e * Math.sin(E);
+                }
+
+                // True Anomaly v
+                const v = 2 * Math.atan(Math.sqrt((1 + e) / (1 - e)) * Math.tan(E / 2));
+                const r = (a * (1 - e * e)) / (1 + e * Math.cos(v));
+
+                this.objects.planet.position.set(r * Math.cos(v), r * Math.sin(v), 0);
+
+                // Law 2: Sweep Area
+                if (this.state.law === 2) {
+                    // Update sector geometry to show swept area over last few frames
+                    if (!this.sweepPoints) this.sweepPoints = [];
+
+                    // Add current point
+                    this.sweepPoints.push(new THREE.Vector3(r * Math.cos(v), r * Math.sin(v), 0));
+
+                    // Keep only last 50 points (tail)
+                    if (this.sweepPoints.length > 50) this.sweepPoints.shift();
+
+                    if (this.sweepPoints.length > 2) {
+                        const points = [new THREE.Vector3(0, 0, 0), ...this.sweepPoints];
+                        const geometry = this.objects.sector.geometry;
+                        geometry.setFromPoints(points);
+
+                        // Create indices for triangle fan
+                        const indices = [];
+                        for (let i = 1; i < points.length - 1; i++) {
+                            indices.push(0, i, i + 1);
+                        }
+                        geometry.setIndex(indices);
+                        geometry.computeVertexNormals();
+                    }
+                } else {
+                    this.sweepPoints = [];
+                }
+
+                // Law 3: Animate Planet 2
+                if (this.state.law === 3) {
+                    const a2 = this.state.planet2Dist;
+                    const T2 = Math.sqrt(Math.pow(a2, 3));
+                    const T1 = Math.sqrt(Math.pow(a, 3));
+
+                    // Scale time so T1 matches
+                    const M2 = t * (T1 / T2);
+                    const x2 = a2 * Math.cos(M2);
+                    const y2 = a2 * Math.sin(M2);
+                    this.objects.planet2.position.set(x2, y2, 0);
+                }
+
+                this.renderer.render(this.scene, this.camera);
+            }
+
+            onResize() {
+                if (!this.container) return;
+                this.camera.aspect = this.container.clientWidth / this.container.clientHeight;
+                this.camera.updateProjectionMatrix();
+                this.renderer.setSize(this.container.clientWidth, this.container.clientHeight);
+            }
+        }
+
+        // --- 3. MAIN APP LOGIC ---
         const app = {
             state: { currentView: 'intro', unlockedMissions: 1, rank: 0, lang: 'en', activeQuiz: null },
             rankColors: [
@@ -1763,6 +2088,21 @@
             unlockNextMission: (currentId) => { const missions = missionsData[app.state.lang]; if (currentId === app.state.unlockedMissions) { const oldRank = app.state.rank; const t = i18n[app.state.lang]; app.state.unlockedMissions++; const newRankIndex = Math.min(app.state.unlockedMissions - 1, t.ranks.length - 1); app.state.rank = newRankIndex; app.saveProgress(); if (newRankIndex > oldRank) { app.showRankUpModal(t.ranks[newRankIndex]); } else { app.updateRankVisuals(); } } app.closeQuiz(); app.showDashboard(); },
             showRankUpModal: (rankName) => { const modal = document.getElementById('rank-modal'); document.getElementById('new-rank-name').innerText = rankName; modal.classList.remove('hidden'); app.updateRankVisuals(); },
             closeRankModal: () => document.getElementById('rank-modal').classList.add('hidden'),
+
+            // --- Kepler Lab Logic ---
+            launchKeplerLab: () => {
+                document.getElementById('kepler-modal').classList.remove('hidden');
+                if (!window.keplerLab) {
+                    window.keplerLab = new KeplerLab();
+                }
+                window.keplerLab.init();
+            },
+            closeKeplerLab: () => {
+                document.getElementById('kepler-modal').classList.add('hidden');
+                if (window.keplerLab) {
+                    window.keplerLab.stop();
+                }
+            },
             updateRankVisuals: () => { const t = i18n[app.state.lang]; const rankName = t.ranks[app.state.rank]; document.getElementById('rank-display').innerText = rankName; const style = app.rankColors[app.state.rank] || app.rankColors[0]; document.getElementById('rank-display').className = `font-bold font-mono transition-colors duration-500 ${style.text}`; document.getElementById('profile-container').className = `w-12 h-12 rounded-full bg-slate-800 border-2 flex items-center justify-center relative overflow-hidden transition-all duration-500 ${style.border} ${style.shadow}`; document.getElementById('profile-glow').className = `absolute inset-0 opacity-50 blur-md transition-colors duration-500 ${style.glow}`; },
             renderDashboard: () => { const list = document.getElementById('mission-list'); list.innerHTML = ''; const t = i18n[app.state.lang]; const missions = missionsData[app.state.lang]; missions.forEach((mission, index) => { const isUnlocked = mission.id <= app.state.unlockedMissions; const isCompleted = mission.id < app.state.unlockedMissions; const alignClass = index % 2 === 0 ? 'md:flex-row' : 'md:flex-row-reverse'; const margin = index % 2 === 0 ? 'md:pr-12' : 'md:pl-12'; const unlockedClass = isUnlocked ? 'opacity-100' : 'opacity-50 grayscale'; const borderClass = isUnlocked ? `border-${mission.color}-500` : 'border-slate-700'; const safeColor = mission.color === 'neon-gold' ? 'yellow' : mission.color; const delay = (index + 1) * 150; let button = isUnlocked ? `<button onclick="app.loadMission(${mission.id})" class="mt-4 px-6 py-2 bg-${safeColor}-500/10 border border-${safeColor}-500 text-${safeColor}-400 clip-corners hover:bg-${safeColor}-500 hover:text-white transition-all text-sm font-bold uppercase tracking-wider shadow-[0_0_10px_rgba(0,0,0,0)] hover:shadow-[0_0_15px_currentColor]">${isCompleted ? t.accessLog : t.startMission}</button>` : `<div class="mt-4 flex items-center gap-2 text-xs text-red-400 font-mono uppercase tracking-widest"><i class="ph-bold ph-lock-key"></i> ${t.locked}</div>`; list.innerHTML += `<div class="flex flex-col ${alignClass} items-center w-full relative group stagger-item" style="animation-delay: ${delay}ms"><div class="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-4 h-4 rounded-full ${isUnlocked ? `bg-${safeColor}-500 shadow-[0_0_15px_var(--neon-${safeColor})]` : 'bg-slate-700'} z-10 hidden md:block border-2 border-slate-900 transition-all"></div><div class="w-full md:w-5/12 ${margin} mb-8 md:mb-0 relative z-20"><div class="glass-panel p-6 border-l-4 ${borderClass} ${unlockedClass} hover:scale-[1.02] transition-transform duration-300 clip-corners"><div class="flex justify-between items-start mb-2"><div class="inline-flex items-center justify-center w-10 h-10 bg-slate-800 text-${safeColor}-400 mb-3 border border-white/10"><i class="${mission.icon} text-xl"></i></div>${isCompleted ? '<i class="ph-fill ph-check-circle text-green-400 text-2xl drop-shadow-[0_0_5px_rgba(74,222,128,0.8)]"></i>' : ''}</div><h3 class="text-2xl font-bold text-white mb-1 orbitron">${t.missionPrefix} 0${mission.id}</h3><h4 class="text-lg text-${safeColor}-400 font-semibold mb-2 font-mono">${mission.title}</h4><p class="text-sm text-gray-400 leading-relaxed mb-4">${mission.description}</p>${button}</div></div></div>`; }); },
             loadMission: (id) => { app.animateWarp(() => { const missions = missionsData[app.state.lang]; const mission = missions.find(m => m.id === id); const container = document.getElementById('mission-content-area'); const t = i18n[app.state.lang]; const safeColor = mission.color === 'neon-gold' ? 'yellow' : mission.color; let contentHTML = `<div class="relative glass-panel overflow-hidden mb-8 shadow-[0_0_30px_rgba(0,0,0,0.5)] border-t border-${safeColor}-500 stagger-item" style="animation-delay: 100ms"><div class="p-8 md:p-12 relative"><div class="absolute top-0 right-0 p-4 opacity-10"><i class="${mission.icon} text-9xl text-white"></i></div><div class="flex items-center gap-4 mb-6 relative z-10"><i class="${mission.icon} text-4xl text-${safeColor}-400 animate-pulse"></i><div><h2 class="text-4xl md:text-5xl font-black text-white orbitron" id="mission-title-anim">${mission.title.toUpperCase()}</h2><p class="text-xl text-${safeColor}-300 font-light tracking-wide font-mono">${mission.subtitle}</p></div></div><p class="text-lg md:text-xl text-gray-300 border-l-2 border-${safeColor}-500/50 pl-4 italic max-w-3xl relative z-10">${mission.content.intro}</p></div></div>`; mission.content.sections.forEach((section, sIdx) => { const delay = (sIdx + 2) * 150; contentHTML += `<div class="mb-12 stagger-item" style="animation-delay: ${delay}ms"><h3 class="text-2xl font-bold text-white mb-4 flex items-center gap-3"><span class="w-8 h-1 bg-${safeColor}-500 rounded-full box-shadow-glow"></span>${section.title}</h3><p class="text-gray-300 mb-6 text-lg pl-11">${section.text}</p><div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 pl-0 md:pl-11">${section.cards.map((card, cIdx) => `<div onclick="app.showDetail(${id}, ${sIdx}, ${cIdx})" class="cursor-pointer bg-slate-800/40 border border-white/5 p-5 hover:bg-slate-800/80 hover:border-${safeColor}-500/50 transition-all group relative overflow-hidden clip-corners"><div class="absolute top-0 right-0 p-2 opacity-0 group-hover:opacity-100 transition-opacity"><i class="ph-bold ph-info text-${safeColor}-400"></i></div><i class="${card.icon} text-3xl text-${safeColor}-400 mb-3 group-hover:scale-110 transition-transform block drop-shadow-md"></i><h4 class="font-bold text-white mb-1 group-hover:text-${safeColor}-300 transition-colors font-mono">${card.name}</h4><p class="text-xs text-gray-400 leading-relaxed">${card.detail}</p></div>`).join('')}</div></div>`; }); const isCompleted = app.state.unlockedMissions > id; contentHTML += `<div class="mt-16 text-center py-12 border-t border-white/10 stagger-item" style="animation-delay: 800ms"><button onclick="app.openQuiz(${id})" class="px-10 py-4 bg-gradient-to-r from-${safeColor}-600 to-${safeColor}-400 text-black font-bold clip-corners shadow-lg shadow-${safeColor}-500/30 hover:shadow-${safeColor}-500/50 hover:scale-105 transition-all text-lg flex items-center gap-2 mx-auto"><i class="ph-bold ph-check-square"></i> ${isCompleted ? t.practice : t.complete}</button></div>`; container.innerHTML = contentHTML; app.switchView('mission-detail'); const titleEl = document.getElementById('mission-title-anim'); if (titleEl && app.state.lang === 'en') app.scrambleText(titleEl, mission.title.toUpperCase()); }); },
@@ -1779,6 +2119,69 @@
         window.addEventListener('resize', starSystem.init);
         app.init(); 
     </script>
+
+    <!-- Kepler Lab Modal -->
+    <div id="kepler-modal" class="fixed inset-0 z-[200] bg-slate-900 hidden flex flex-col">
+        <!-- Header -->
+        <div
+            class="flex justify-between items-center p-6 border-b border-purple-500/30 bg-slate-900/90 backdrop-blur-md z-10">
+            <div class="flex items-center gap-4">
+                <i class="ph-fill ph-atom text-4xl text-purple-400 animate-spin-slow"></i>
+                <div>
+                    <h2 class="text-3xl font-bold text-white orbitron tracking-widest">KEPLER LAB</h2>
+                    <p class="text-purple-300 font-mono text-sm">PLANETARY MOTION SIMULATOR</p>
+                </div>
+            </div>
+            <button onclick="app.closeKeplerLab()" class="p-2 hover:bg-white/10 rounded-full transition-colors">
+                <i class="ph-bold ph-x text-2xl text-white"></i>
+            </button>
+        </div>
+
+        <!-- Main Content -->
+        <div class="flex-1 flex relative overflow-hidden">
+            <!-- 3D Canvas Container -->
+            <div class="flex-1 relative bg-black" id="kepler-canvas-container">
+                <canvas id="kepler-canvas" class="w-full h-full block"></canvas>
+
+                <!-- Overlay Info -->
+                <div class="absolute top-6 left-6 max-w-md pointer-events-none">
+                    <div class="glass-panel p-6 border-l-4 border-purple-500 animate-fade-in">
+                        <h3 class="text-2xl font-bold text-white mb-2" id="kepler-law-title">Law 1: The Law of Ellipses
+                        </h3>
+                        <p class="text-gray-300 leading-relaxed" id="kepler-law-desc">
+                            Planets move in elliptical orbits with the Sun at one focus.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Controls Sidebar -->
+            <div class="w-96 bg-slate-900/95 border-l border-white/10 p-6 flex flex-col gap-8 z-10 backdrop-blur-xl">
+                <!-- Tabs -->
+                <div class="flex p-1 bg-slate-800 rounded-lg">
+                    <button onclick="keplerLab.setLaw(1)"
+                        class="flex-1 py-2 text-sm font-bold rounded transition-all bg-purple-600 text-white shadow-lg"
+                        id="tab-law-1">LAW 1</button>
+                    <button onclick="keplerLab.setLaw(2)"
+                        class="flex-1 py-2 text-sm font-bold rounded transition-all text-gray-400 hover:text-white"
+                        id="tab-law-2">LAW 2</button>
+                    <button onclick="keplerLab.setLaw(3)"
+                        class="flex-1 py-2 text-sm font-bold rounded transition-all text-gray-400 hover:text-white"
+                        id="tab-law-3">LAW 3</button>
+                </div>
+
+                <!-- Controls Container -->
+                <div id="kepler-controls" class="space-y-8">
+                    <!-- Dynamic controls injected here -->
+                </div>
+
+                <!-- Stats/Metrics -->
+                <div class="mt-auto p-4 bg-black/40 rounded border border-white/5 font-mono text-sm" id="kepler-stats">
+                    <!-- Dynamic stats -->
+                </div>
+            </div>
+        </div>
+    </div>
 </body>
 
 </html>
