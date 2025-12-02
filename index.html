@@ -1808,9 +1808,13 @@
                     }
                 });
 
+                // Get current language
+                const lang = document.body.classList.contains('lang-hi') ? 'hi' : 'en';
+
                 // Update Info & Controls
-                const title = document.getElementById('kepler-law-title');
-                const desc = document.getElementById('kepler-law-desc');
+                const titleBrief = document.getElementById('kepler-law-title-brief');
+                const descBrief = document.getElementById('kepler-law-desc-brief');
+                const detailedInfo = document.getElementById('kepler-detailed-info');
                 const controls = document.getElementById('kepler-controls');
                 const stats = document.getElementById('kepler-stats');
 
@@ -1823,52 +1827,129 @@
                 this.objects.focus2.visible = false;
                 this.objects.sector.visible = false;
 
+                // Bilingual content for each law
+                const lawContent = {
+                    1: {
+                        en: {
+                            titleBrief: "Law 1: The Law of Ellipses",
+                            descBrief: "Planets move in elliptical orbits with the Sun at one focus.",
+                            detailed: `
+                                <p><strong>🔭 Discovery:</strong> Johannes Kepler discovered in 1609 that all planets move in elliptical orbits, not perfect circles as previously believed.</p>
+                                <p><strong>🎯 Key Concept:</strong> An ellipse has two focal points (foci). The Sun occupies one focus, while the other remains empty. The planet's distance from the Sun constantly changes as it orbits.</p>
+                                <p><strong>📐 Eccentricity (e):</strong> Measures how "stretched" the ellipse is. e=0 is a perfect circle, while e approaching 1 is highly elongated.</p>
+                                <p><strong>✨ Fun Fact:</strong> Earth's orbit has an eccentricity of only 0.0167, making it nearly circular! Mercury has the most eccentric orbit at 0.206, while Venus has the most circular at 0.007.</p>
+                            `
+                        },
+                        hi: {
+                            titleBrief: "नियम 1: दीर्घवृत्त का नियम",
+                            descBrief: "सभी ग्रह दीर्घवृत्ताकार कक्षाओं में चलते हैं, जिसमें सूर्य एक फोकस पर होता है।",
+                            detailed: `
+                                <p><strong>🔭 खोज:</strong> जोहान्स केप्लर ने 1609 में खोजा कि सभी ग्रह दीर्घवृत्ताकार कक्षाओं में चलते हैं, न कि पूर्ण वृत्त में जैसा पहले माना जाता था।</p>
+                                <p><strong>🎯 मुख्य अवधारणा:</strong> एक दीर्घवृत्त में दो फोकस बिंदु होते हैं। सूर्य एक फोकस पर होता है, जबकि दूसरा खाली रहता है। ग्रह की सूर्य से दूरी लगातार बदलती रहती है।</p>
+                                <p><strong>📐 उत्केन्द्रता (e):</strong> यह मापता है कि दीर्घवृत्त कितना "खिंचा हुआ" है। e=0 एक पूर्ण वृत्त है, जबकि e का 1 के करीब होना अत्यधिक लम्बा होना दर्शाता है।</p>
+                                <p><strong>✨ रोचक तथ्य:</strong> पृथ्वी की कक्षा की उत्केन्द्रता केवल 0.0167 है, जो इसे लगभग वृत्ताकार बनाती है! बुध की कक्षा सबसे अधिक उत्केन्द्र है (0.206), जबकि शुक्र की सबसे वृत्ताकार है (0.007)।</p>
+                            `
+                        }
+                    },
+                    2: {
+                        en: {
+                            titleBrief: "Law 2: The Law of Equal Areas",
+                            descBrief: "A line connecting the planet to the Sun sweeps equal areas in equal times.",
+                            detailed: `
+                                <p><strong>🔭 Discovery:</strong> Also discovered in 1609, this law explains why planets move faster when closer to the Sun.</p>
+                                <p><strong>🎯 Key Concept:</strong> An imaginary line connecting the planet to the Sun sweeps out equal areas in equal time intervals. This means the planet must move faster when closer to the Sun (perihelion) and slower when farther away (aphelion).</p>
+                                <p><strong>⚡ Conservation:</strong> This law is a consequence of the conservation of angular momentum - a fundamental principle in physics!</p>
+                                <p><strong>🌍 Real Example:</strong> Earth moves about 30.3 km/s at perihelion (closest to Sun in January) but only 29.3 km/s at aphelion (farthest in July). That's a 3% speed difference!</p>
+                            `
+                        },
+                        hi: {
+                            titleBrief: "नियम 2: समान क्षेत्रफल का नियम",
+                            descBrief: "ग्रह को सूर्य से जोड़ने वाली रेखा समान समय में समान क्षेत्रफल तय करती है।",
+                            detailed: `
+                                <p><strong>🔭 खोज:</strong> यह भी 1609 में खोजा गया था, यह नियम बताता है कि ग्रह सूर्य के पास तेज़ी से क्यों चलते हैं।</p>
+                                <p><strong>🎯 मुख्य अवधारणा:</strong> ग्रह को सूर्य से जोड़ने वाली एक काल्पनिक रेखा समान समय अंतराल में समान क्षेत्रफल तय करती है। इसका मतलब है कि ग्रह सूर्य के पास (उपसौर) तेज़ी से और दूर (अपसौर) धीमी गति से चलता है।</p>
+                                <p><strong>⚡ संरक्षण:</strong> यह नियम कोणीय संवेग के संरक्षण का परिणाम है - भौतिकी का एक मौलिक सिद्धांत!</p>
+                                <p><strong>🌍 वास्तविक उदाहरण:</strong> पृथ्वी उपसौर पर (जनवरी में सूर्य के सबसे करीब) लगभग 30.3 किमी/सेकंड की गति से चलती है लेकिन अपसौर पर (जुलाई में सबसे दूर) केवल 29.3 किमी/सेकंड। यह 3% की गति का अंतर है!</p>
+                            `
+                        }
+                    },
+                    3: {
+                        en: {
+                            titleBrief: "Law 3: The Law of Harmonies",
+                            descBrief: "The square of orbital period is proportional to the cube of orbital distance.",
+                            detailed: `
+                                <p><strong>🔭 Discovery:</strong> Discovered in 1619 (10 years after the first two laws), this mathematical relationship connects orbital period to orbital size.</p>
+                                <p><strong>🎯 Key Concept:</strong> The formula is T² ∝ a³, where T is the orbital period (time to complete one orbit) and a is the semi-major axis (average distance from the Sun).</p>
+                                <p><strong>🔧 Practical Use:</strong> If you know a planet's distance from the Sun, you can calculate its orbital period, and vice versa! This law works for any object orbiting the Sun.</p>
+                                <p><strong>🌟 Amazing Example:</strong> Mercury orbits in 88 days at 0.39 AU, while Neptune takes 165 years at 30 AU. The relationship T²/a³ is constant for all planets!</p>
+                                <p><strong>🚀 Beyond Solar System:</strong> This law also applies to moons orbiting planets and even artificial satellites orbiting Earth!</p>
+                            `
+                        },
+                        hi: {
+                            titleBrief: "नियम 3: सामंजस्य का नियम",
+                            descBrief: "कक्षीय अवधि का वर्ग कक्षीय दूरी के घन के समानुपाती होता है।",
+                            detailed: `
+                                <p><strong>🔭 खोज:</strong> 1619 में खोजा गया (पहले दो नियमों के 10 साल बाद), यह गणितीय संबंध कक्षीय अवधि को कक्षीय आकार से जोड़ता है।</p>
+                                <p><strong>🎯 मुख्य अवधारणा:</strong> सूत्र है T² ∝ a³, जहाँ T कक्षीय अवधि है (एक परिक्रमा पूरी करने का समय) और a अर्ध-दीर्घ अक्ष है (सूर्य से औसत दूरी)।</p>
+                                <p><strong>🔧 व्यावहारिक उपयोग:</strong> यदि आप किसी ग्रह की सूर्य से दूरी जानते हैं, तो आप उसकी कक्षीय अवधि की गणना कर सकते हैं, और इसके विपरीत! यह नियम सूर्य की परिक्रमा करने वाली किसी भी वस्तु के लिए काम करता है।</p>
+                                <p><strong>🌟 अद्भुत उदाहरण:</strong> बुध 0.39 AU पर 88 दिनों में परिक्रमा करता है, जबकि नेपच्यून 30 AU पर 165 साल लेता है। सभी ग्रहों के लिए T²/a³ का संबंध स्थिर है!</p>
+                                <p><strong>🚀 सौर मंडल से परे:</strong> यह नियम ग्रहों की परिक्रमा करने वाले चंद्रमाओं और यहां तक कि पृथ्वी की परिक्रमा करने वाले कृत्रिम उपग्रहों पर भी लागू होता है!</p>
+                            `
+                        }
+                    }
+                };
+
+                const content = lawContent[id][lang];
+                titleBrief.innerText = content.titleBrief;
+                descBrief.innerText = content.descBrief;
+                detailedInfo.innerHTML = content.detailed;
+
                 if (id === 1) {
-                    title.innerText = "Law 1: The Law of Ellipses";
-                    desc.innerText = "All planets move in elliptical orbits, with the sun at one focus.";
                     this.objects.focus2.visible = true;
 
                     controls.innerHTML = `
                         <div>
-                            <label class="block text-gray-400 text-xs font-bold mb-2 uppercase">Eccentricity (e)</label>
+                            <label class="block text-gray-400 text-xs font-bold mb-2 uppercase">${lang === 'hi' ? 'उत्केन्द्रता (e)' : 'Eccentricity (e)'}</label>
                             <input type="range" min="0" max="0.8" step="0.01" value="${this.state.eccentricity}" 
                                 class="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-purple-500"
                                 oninput="keplerLab.updateParam('eccentricity', this.value)">
                             <div class="flex justify-between text-xs text-gray-500 mt-1">
-                                <span>Circle (0)</span>
+                                <span>${lang === 'hi' ? 'वृत्त (0)' : 'Circle (0)'}</span>
                                 <span id="val-ecc">${this.state.eccentricity}</span>
-                                <span>Ellipse (0.8)</span>
+                                <span>${lang === 'hi' ? 'दीर्घवृत्त (0.8)' : 'Ellipse (0.8)'}</span>
                             </div>
+                        </div>
+                        <div class="p-4 bg-purple-900/20 border border-purple-500/30 rounded text-xs text-purple-200">
+                            <strong>💡 ${lang === 'hi' ? 'यह आज़माएं:' : 'Try This:'}</strong> ${lang === 'hi' ? 'उत्केन्द्रता स्लाइडर को समायोजित करें और देखें कि कक्षा का आकार कैसे बदलता है। ध्यान दें कि सूर्य (पीला) एक फोकस पर रहता है जबकि दूसरा फोकस (सफेद बिंदु) चलता है!' : 'Adjust the eccentricity slider to see how the orbit shape changes. Notice how the Sun (yellow) stays at one focus while the other focus (white dot) moves!'}
                         </div>
                     `;
                 } else if (id === 2) {
-                    title.innerText = "Law 2: The Law of Equal Areas";
-                    desc.innerText = "A line that connects a planet to the sun sweeps out equal areas in equal times.";
                     this.objects.sector.visible = true;
 
                     controls.innerHTML = `
                         <div>
-                            <label class="block text-gray-400 text-xs font-bold mb-2 uppercase">Eccentricity (e)</label>
+                            <label class="block text-gray-400 text-xs font-bold mb-2 uppercase">${lang === 'hi' ? 'उत्केन्द्रता (e)' : 'Eccentricity (e)'}</label>
                             <input type="range" min="0" max="0.8" step="0.01" value="${this.state.eccentricity}" 
                                 class="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-purple-500"
                                 oninput="keplerLab.updateParam('eccentricity', this.value)">
                         </div>
-                        <div class="p-4 bg-purple-900/20 border border-purple-500/30 rounded text-sm text-purple-200">
-                            Watch the planet speed up near the Sun (Perihelion) and slow down when far away (Aphelion).
+                        <div class="p-4 bg-purple-900/20 border border-purple-500/30 rounded text-xs text-purple-200">
+                            <strong>🔍 ${lang === 'hi' ? 'देखें:' : 'Observe:'}</strong> ${lang === 'hi' ? 'बैंगनी क्षेत्र को देखें। ग्रह सूर्य के पास (उपसौर) तेज़ी से चलता है और दूर (अपसौर) धीमा हो जाता है, लेकिन समान समय अवधि में तय किया गया क्षेत्रफल स्थिर रहता है!' : 'Watch the purple sector area. The planet speeds up near the Sun (perihelion) and slows down when far away (aphelion), but the swept area remains constant over equal time periods!'}
                         </div>
                     `;
                 } else if (id === 3) {
-                    title.innerText = "Law 3: The Law of Harmonies";
-                    desc.innerText = "The square of the orbital period of a planet is directly proportional to the cube of the semi-major axis of its orbit.";
                     this.objects.planet2.visible = true;
                     this.objects.orbit2.visible = true;
 
                     controls.innerHTML = `
                         <div>
-                            <label class="block text-gray-400 text-xs font-bold mb-2 uppercase">Planet 2 Distance (a)</label>
+                            <label class="block text-gray-400 text-xs font-bold mb-2 uppercase">${lang === 'hi' ? 'ग्रह 2 की दूरी (a)' : 'Planet 2 Distance (a)'}</label>
                             <input type="range" min="5" max="25" step="0.5" value="${this.state.planet2Dist}" 
                                 class="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-pink-500"
                                 oninput="keplerLab.updateParam('planet2Dist', this.value)">
+                        </div>
+                        <div class="p-4 bg-purple-900/20 border border-purple-500/30 rounded text-xs text-purple-200">
+                            <strong>🎯 ${lang === 'hi' ? 'प्रयोग करें:' : 'Experiment:'}</strong> ${lang === 'hi' ? 'गुलाबी ग्रह की दूरी को समायोजित करें। ध्यान दें कि दूर का ग्रह एक परिक्रमा पूरी करने में कितना अधिक समय लेता है। संबंध T² = k × a³ का पालन करता है जहाँ k स्थिर है!' : 'Adjust the distance of the pink planet. Notice how the farther planet takes much longer to complete one orbit. The relationship follows T² = k × a³ where k is constant!'}
                         </div>
                     `;
                 }
@@ -2045,9 +2126,21 @@
             },
             toggleLanguage: () => {
                 app.state.lang = app.state.lang === 'en' ? 'hi' : 'en';
+                // Toggle main nav buttons
                 document.getElementById('btn-en').classList.toggle('active'); document.getElementById('btn-hi').classList.toggle('active');
+                // Toggle Kepler Lab buttons if they exist
+                const keplerEnBtn = document.getElementById('btn-en-kepler');
+                const keplerHiBtn = document.getElementById('btn-hi-kepler');
+                if (keplerEnBtn && keplerHiBtn) {
+                    keplerEnBtn.classList.toggle('active');
+                    keplerHiBtn.classList.toggle('active');
+                }
                 if (app.state.lang === 'hi') { document.body.classList.add('lang-hi'); document.body.classList.remove('lang-en'); } else { document.body.classList.add('lang-en'); document.body.classList.remove('lang-hi'); }
                 app.updateUI(); if (app.state.currentView === 'dashboard') app.renderDashboard(); if (app.state.currentView === 'mission-detail') app.showDashboard();
+                // Refresh Kepler Lab if it's open
+                if (window.keplerLab && !document.getElementById('kepler-modal').classList.contains('hidden')) {
+                    window.keplerLab.setLaw(window.keplerLab.state.law);
+                }
             },
             updateUI: () => {
                 const t = i18n[app.state.lang];
@@ -2132,9 +2225,16 @@
                     <p class="text-purple-300 font-mono text-sm">PLANETARY MOTION SIMULATOR</p>
                 </div>
             </div>
-            <button onclick="app.closeKeplerLab()" class="p-2 hover:bg-white/10 rounded-full transition-colors">
-                <i class="ph-bold ph-x text-2xl text-white"></i>
-            </button>
+            <div class="flex items-center gap-3">
+                <!-- Language Toggle for Kepler Lab -->
+                <div class="lang-switch" onclick="app.toggleLanguage()">
+                    <div class="lang-option active" id="btn-en-kepler">EN</div>
+                    <div class="lang-option" id="btn-hi-kepler">HI</div>
+                </div>
+                <button onclick="app.closeKeplerLab()" class="p-2 hover:bg-white/10 rounded-full transition-colors">
+                    <i class="ph-bold ph-x text-2xl text-white"></i>
+                </button>
+            </div>
         </div>
 
         <!-- Main Content -->
@@ -2143,12 +2243,13 @@
             <div class="flex-1 relative bg-black" id="kepler-canvas-container">
                 <canvas id="kepler-canvas" class="w-full h-full block"></canvas>
 
-                <!-- Overlay Info -->
-                <div class="absolute top-6 left-6 max-w-md pointer-events-none">
-                    <div class="glass-panel p-6 border-l-4 border-purple-500 animate-fade-in">
-                        <h3 class="text-2xl font-bold text-white mb-2" id="kepler-law-title">Law 1: The Law of Ellipses
+                <!-- Overlay Info - Brief Only -->
+                <div class="absolute top-6 left-6 max-w-sm pointer-events-none">
+                    <div class="glass-panel p-4 border-l-4 border-purple-500 animate-fade-in">
+                        <h3 class="text-xl font-bold text-white mb-1" id="kepler-law-title-brief">Law 1: The Law of
+                            Ellipses
                         </h3>
-                        <p class="text-gray-300 leading-relaxed" id="kepler-law-desc">
+                        <p class="text-gray-300 text-sm" id="kepler-law-desc-brief">
                             Planets move in elliptical orbits with the Sun at one focus.
                         </p>
                     </div>
@@ -2156,9 +2257,10 @@
             </div>
 
             <!-- Controls Sidebar -->
-            <div class="w-96 bg-slate-900/95 border-l border-white/10 p-6 flex flex-col gap-8 z-10 backdrop-blur-xl">
+            <div
+                class="w-96 bg-slate-900/95 border-l border-white/10 flex flex-col z-10 backdrop-blur-xl overflow-hidden">
                 <!-- Tabs -->
-                <div class="flex p-1 bg-slate-800 rounded-lg">
+                <div class="flex p-1 bg-slate-800 rounded-lg m-4 mb-0">
                     <button onclick="keplerLab.setLaw(1)"
                         class="flex-1 py-2 text-sm font-bold rounded transition-all bg-purple-600 text-white shadow-lg"
                         id="tab-law-1">LAW 1</button>
@@ -2170,13 +2272,27 @@
                         id="tab-law-3">LAW 3</button>
                 </div>
 
-                <!-- Controls Container -->
-                <div id="kepler-controls" class="space-y-8">
-                    <!-- Dynamic controls injected here -->
+                <!-- Scrollable Content Area -->
+                <div class="flex-1 overflow-y-auto p-4 space-y-4">
+                    <!-- Detailed Law Information -->
+                    <div class="bg-slate-800/50 border border-purple-500/30 rounded-lg p-4">
+                        <h4 class="text-purple-400 font-bold text-sm mb-3 flex items-center gap-2">
+                            <i class="ph-fill ph-book-open"></i>
+                            <span id="kepler-info-title">DETAILED EXPLANATION</span>
+                        </h4>
+                        <div id="kepler-detailed-info" class="text-xs text-gray-300 leading-relaxed space-y-2">
+                            <!-- Dynamic detailed content injected here -->
+                        </div>
+                    </div>
+
+                    <!-- Controls Container -->
+                    <div id="kepler-controls" class="space-y-4">
+                        <!-- Dynamic controls injected here -->
+                    </div>
                 </div>
 
-                <!-- Stats/Metrics -->
-                <div class="mt-auto p-4 bg-black/40 rounded border border-white/5 font-mono text-sm" id="kepler-stats">
+                <!-- Stats/Metrics - Fixed at bottom -->
+                <div class="p-4 bg-black/40 border-t border-white/5 font-mono text-sm" id="kepler-stats">
                     <!-- Dynamic stats -->
                 </div>
             </div>
