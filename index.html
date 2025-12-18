@@ -2554,8 +2554,7 @@
 
                 // Update Focus 2 Position
                 this.objects.focus2.position.set(-2 * c, 0, 0); // Sun is at (0,0), other focus is at (-2ae, 0) relative to sun? 
-                // Wait, standard polar equation puts Sun at origin (one focus).
-                // Center of ellipse is at (-c, 0). Other focus is at (-2c, 0).
+                
                 this.objects.focus2.position.set(-2 * c, 0, 0);
 
                 // Law 3: Update Orbit 2
@@ -2602,34 +2601,34 @@
                 this.state.time += 0.01 * this.state.speed;
                 const t = this.state.time;
 
-                // Animate Planet 1
+                
                 const a = this.state.semiMajorAxis;
                 const e = this.state.eccentricity;
 
                 // Solve Kepler's Equation M = E - e sin E (Approximation)
                 // Mean Anomaly M
                 const M = t;
-                // Eccentric Anomaly E (Iterative Newton's method)
+               
                 let E = M;
                 for (let i = 0; i < 5; i++) {
                     E = M + e * Math.sin(E);
                 }
 
-                // True Anomaly v
+                
                 const v = 2 * Math.atan(Math.sqrt((1 + e) / (1 - e)) * Math.tan(E / 2));
                 const r = (a * (1 - e * e)) / (1 + e * Math.cos(v));
 
                 this.objects.planet.position.set(r * Math.cos(v), r * Math.sin(v), 0);
 
-                // Law 2: Sweep Area
+                
                 if (this.state.law === 2) {
-                    // Update sector geometry to show swept area over last few frames
+                    
                     if (!this.sweepPoints) this.sweepPoints = [];
 
-                    // Add current point
+                    
                     this.sweepPoints.push(new THREE.Vector3(r * Math.cos(v), r * Math.sin(v), 0));
 
-                    // Keep only last 50 points (tail)
+                    
                     if (this.sweepPoints.length > 50) this.sweepPoints.shift();
 
                     if (this.sweepPoints.length > 2) {
@@ -2637,7 +2636,7 @@
                         const geometry = this.objects.sector.geometry;
                         geometry.setFromPoints(points);
 
-                        // Create indices for triangle fan
+                       
                         const indices = [];
                         for (let i = 1; i < points.length - 1; i++) {
                             indices.push(0, i, i + 1);
